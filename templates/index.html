@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Señales Spot · Binance</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root{
+    --bg:#181a20; --panel:#1e2329; --line:#2b3139; --txt:#eaecef; --muted:#848e9c;
+    --yellow:#fcd535; --green:#0ecb81; --red:#f6465d; --blue:#3b82f6;
+    --mono:ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--txt);display:flex;flex-direction:column;overflow:hidden;
+       font:12.5px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);background:#1b1e25}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+  .brand .logo{width:22px;height:22px;border-radius:5px;background:var(--yellow);color:#181a20;display:grid;place-items:center;font-weight:900}
+  .sub{color:var(--muted);font-size:10.5px}
+  .hspace{margin-left:auto;display:flex;align-items:center;gap:10px}
+  select,input{background:#181a20;border:1px solid var(--line);color:var(--txt);border-radius:5px;padding:5px 8px;font-size:12px;outline:none}
+  select:focus,input:focus{border-color:var(--yellow)}
+  .precio{font-size:18px;font-weight:800;color:var(--yellow)}
+  .pill{padding:3px 10px;border-radius:999px;font-size:11px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+  .pill.ok{color:var(--green);border-color:rgba(14,203,129,.5)}
+  .pill.warn{color:var(--yellow);border-color:rgba(252,213,53,.5)}
+  .banner{display:none;flex:0 0 auto;margin:8px 14px 0;padding:14px 18px;border-radius:10px;
+          background:linear-gradient(90deg, rgba(14,203,129,.22), rgba(14,203,129,.06));
+          border:1px solid var(--green);color:#eafff6;animation:pulso 1.6s infinite}
+  @keyframes pulso{0%,100%{box-shadow:0 0 0 0 rgba(14,203,129,.45)}50%{box-shadow:0 0 0 10px rgba(14,203,129,0)}}
+  .banner .t{font-size:20px;font-weight:800;color:var(--green);letter-spacing:.4px}
+  .banner.vieja{background:rgba(132,142,156,.08);border-color:var(--muted);animation:none}
+  .banner.vieja .t{color:var(--muted)}
+  main{flex:1 1 auto;display:grid;grid-template-columns:290px minmax(0,1fr) 330px;gap:10px;padding:10px 14px;min-height:0;overflow:hidden}
+  .col{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;padding-right:2px}
+  .col::-webkit-scrollbar{width:5px}
+  .col::-webkit-scrollbar-thumb{background:#2b3139;border-radius:3px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px;flex:0 0 auto}
+  .card.fill{flex:1 1 auto;min-height:120px;display:flex;flex-direction:column}
+  .card h2{margin:0 0 7px;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+  /* ===== Order Book (estilo Binance) ===== */
+  .ob-head{display:flex;font-size:10px;color:var(--muted);padding:0 4px 4px;border-bottom:1px solid var(--line);margin-bottom:3px}
+  .ob-head span{flex:1}
+  .ob-head span:nth-child(2), .ob-head span:nth-child(3){text-align:right}
+  .ob-rows{font:11.5px/1.5 var(--mono)}
+  .ob-row{position:relative;display:flex;padding:0 4px;border-radius:2px}
+  .ob-row span{flex:1;position:relative;z-index:1}
+  .ob-row span.p{text-align:left}
+  .ob-row span.a, .ob-row span.t{text-align:right}
+  .ob-row .bar{position:absolute;top:0;bottom:0;right:0;opacity:.14;z-index:0}
+  .ob-row.ask .bar{background:var(--red)}
+  .ob-row.bid .bar{background:var(--green)}
+  .ob-row.ask span.p{color:var(--red)}
+  .ob-row.bid span.p{color:var(--green)}
+  .ob-row span.a, .ob-row span.t{color:#c7ccd6}
+  .ob-mid{padding:7px 4px;margin:3px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .ob-mid .p{font-size:19px;font-weight:800;font-family:var(--mono)}
+  .ob-mid .p.up{color:var(--green)} .ob-mid .p.down{color:var(--red)}
+  .ob-mid .s{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:2px}
+  .ob-sum{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);padding:5px 4px 0;border-top:1px solid var(--line);margin-top:3px}
+  .ob-sum b.b{color:var(--green)} .ob-sum b.a{color:var(--red)}
+  /* ===== Chart ===== */
+  .chart-head{display:flex;align-items:center;gap:10px;font:11px var(--mono);color:var(--muted)}
+  .chart-head select{padding:2px 6px;font-size:11px;width:auto}
+  .chart-head .ma7{color:var(--yellow)} .chart-head .ma25{color:#e056fd} .chart-head .ma99{color:var(--blue)}
+  .chart-head .ebuy{color:#0ecb81;font-weight:700;text-shadow:0 0 6px rgba(14,203,129,.85)} .chart-head .esell{color:rgba(246,70,93,.55)}
+  #btnPrecio{background:#2b3139;color:var(--muted);border:0;border-radius:5px;padding:3px 9px;font-size:10.5px;font-weight:600;cursor:pointer}
+  #btnPrecio.on{color:var(--yellow)}
+  .chart-wrap{flex:1;min-height:260px;position:relative;margin-top:6px}
+  /* ===== Métricas ===== */
+  .metricas{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .met{background:#181a20;border:1px solid var(--line);border-radius:7px;padding:6px 9px;min-width:100px}
+  .met .k{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+  .met .v{font-weight:700;font-size:13.5px;margin-top:1px}
+  .score{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:800}
+  .s0,.s1{background:#2b3139;color:var(--muted)}
+  .s2{background:rgba(252,213,53,.15);color:var(--yellow)}
+  .s3,.s4{background:rgba(14,203,129,.16);color:var(--green)}
+  /* ===== Config ===== */
+  .cfg{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}
+  .cfg label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--muted)}
+  .cfg input{width:86px}
+  .cfg select{width:130px}
+  .cfg button{background:var(--yellow);color:#181a20;border:0;border-radius:5px;padding:7px 14px;font-weight:700;cursor:pointer}
+  /* ===== Alertas ===== */
+  .alerta{border:1px solid var(--line);border-radius:7px;padding:7px 9px;margin-bottom:6px;font-size:11.5px}
+  .alerta b{color:var(--green)}
+  .muted{color:var(--muted);font-size:11px}
+  .warn{color:var(--yellow)}
+  @media(max-width:1200px){
+    body{overflow:auto}
+    main{grid-template-columns:1fr 1fr;height:auto;overflow:visible}
+    .col{overflow:visible}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">σ</div> Señales Spot <span class="sub">libro + velas · Binance</span></div>
+  <div class="hspace">
+    <select id="symbolSel"></select>
+    <span class="precio" id="precio">—</span>
+    <span class="pill" id="estadoPill">iniciando</span>
+    <span class="pill" id="hora">—</span>
+  </div>
+</header>
+
+<div class="banner" id="banner">
+  <div class="t" id="bannerTitulo">⚡ OPORTUNO COMPRAR</div>
+  <div id="bannerDetalle" style="margin-top:4px"></div>
+</div>
+
+<main>
+  <!-- ===== Libro de órdenes estilo Binance ===== -->
+  <div class="col">
+    <div class="card">
+      <h2>Order Book</h2>
+      <div class="ob-head"><span id="obH1">Precio (USDT)</span><span id="obH2">Monto (BTC)</span><span id="obH3">Total</span></div>
+      <div class="ob-rows" id="obAsks"></div>
+      <div class="ob-mid">
+        <div class="p" id="obPrecio">—</div>
+        <div class="s"><span id="obSpread">spread —</span><span id="obRatio">B/V —</span></div>
+      </div>
+      <div class="ob-rows" id="obBids"></div>
+      <div class="ob-sum"><span>Σ bids: <b class="b" id="obBidVol">—</b></span><span>Σ asks: <b class="a" id="obAskVol">—</b></span></div>
+    </div>
+  </div>
+
+  <!-- ===== Velas + métricas + config ===== -->
+  <div class="col">
+    <div class="card fill">
+      <div class="chart-head">
+        <select id="intervalSel"></select>
+        <button id="btnPrecio">Precio: OFF</button>
+        <select id="volPct" title="Alto del área de presión con precio visible">
+          <option value="20">Presión 20%</option>
+          <option value="35">Presión 35%</option>
+          <option value="50" selected>Presión 50%</option>
+          <option value="70">Presión 70%</option>
+        </select>
+        <span id="maLegend" class="ma7">—</span>
+      </div>
+      <div class="chart-wrap"><div id="grafico" style="position:absolute;inset:0"></div></div>
+      <div class="metricas">
+        <div class="met"><div class="k">Score</div><div class="v"><span class="score s0" id="scoreBadge">0/4</span></div></div>
+        <div class="met"><div class="k">Ventas /min</div><div class="v" id="mSell">—</div></div>
+        <div class="met"><div class="k">Compras /min</div><div class="v" id="mBuy">—</div></div>
+        <div class="met"><div class="k">Libro (bids−asks)</div><div class="v" id="mImb">—</div></div>
+        <div class="met"><div class="k">Ratio B/V</div><div class="v" id="mRatio">—</div></div>
+        <div class="met"><div class="k">Subida 3 min</div><div class="v" id="mSub">—</div></div>
+        <div class="met"><div class="k">Cruce</div><div class="v" id="mCruce">—</div></div>
+      </div>
+      <div class="cfg">
+        <label>Sensibilidad
+          <select id="cfgSens">
+            <option value="1">Relajada (solo cruce)</option>
+            <option value="2" selected>Moderada (cruce + ventas o compras)</option>
+            <option value="3">Estricta (cruce + ventas↓ + compras↑)</option>
+          </select>
+        </label>
+        <label>Subida compras ≥ (%/min)<input id="cfgBuy" type="number" step="1" value="15"></label>
+        <label>Caída ventas ≤ (%/min)<input id="cfgSell" type="number" step="1" value="-8"></label>
+        <label>Desbalance libro ≥ (%)<input id="cfgImb" type="number" step="1" value="5"></label>
+        <label>Espera entre avisos (min)<input id="cfgCool" type="number" step="1" value="15"></label>
+        <button id="btnAplicar">Aplicar</button>
+        <span class="muted" id="cfgInfo"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Alertas + ayuda ===== -->
+  <div class="col">
+    <div class="card fill">
+      <h2>Alertas</h2>
+      <div id="listaAlertas"><span class="muted">sin alertas todavía</span></div>
+    </div>
+    <div class="card">
+      <h2>Cómo funciona</h2>
+      <div class="muted" style="line-height:1.5">
+        La alerta <b>solo nace del cruce</b>: las EMA de compras deben cruzar al alza a las de ventas.
+        Con sensibilidad <b>Estricta</b>: cruce + <b style="color:var(--red)">ventas cayendo en picada</b> +
+        <b style="color:var(--green)">compras subiendo explosivamente</b> (el escenario ideal).
+        Moderada: cruce + una de las dos. El libro comprador es contexto extra — nunca dispara solo.
+        <b>Solo avisa: no opera.</b>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let lw = null, sCandle = null, sEmaBuy = null, sEmaBuyGlow1 = null, sEmaBuyGlow2 = null, sEmaSell = null, sMA7 = null, sMA25 = null, sMA99 = null;
+let chartListo = false, lastAlertKey = '', firstState = true, prevPrecio = null;
+let mostrarPrecio = localStorage.getItem('precioOn') === '1';   // arranca OFF: solo el cruce
+let volPct = parseInt(localStorage.getItem('volPct') || '50', 10);
+
+async function api(path, body){
+  try{
+    const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
+    return await r.json();
+  }catch(e){
+    return {error: 'sin conexión con el servidor local — volvé a iniciarlo (cd /home/jma/Documents/Proyect/usdt-senales && ./run.sh)'};
+  }
+}
+
+function beep(){
+  try{
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    [0, .25].forEach(t => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = 880; o.type = 'sine';
+      g.gain.setValueAtTime(.001, ac.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(.18, ac.currentTime + t + .02);
+      g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + t + .18);
+      o.connect(g); g.connect(ac.destination);
+      o.start(ac.currentTime + t); o.stop(ac.currentTime + t + .2);
+    });
+  }catch(e){}
+}
+
+const fmtP = p => p >= 1000 ? Number(p).toLocaleString('es-CL', {minimumFractionDigits:2, maximumFractionDigits:2})
+                : p >= 1 ? Number(p).toFixed(3) : Number(p).toFixed(5);
+const fmtQ = q => Number(q).toLocaleString('es-CL', {maximumFractionDigits:5});
+const fmtT = v => {
+  if(v >= 1e6){ return (Math.floor(v / 1e4) / 100).toFixed(2) + 'M'; }
+  if(v >= 1e3){ return (Math.floor(v / 10) / 100).toFixed(2) + 'k'; }
+  return v.toFixed(6);
+};
+let base = 'BTC', quote = 'USDT';
+
+function initChart(){
+  const el = $('grafico');
+  lw = LightweightCharts.createChart(el, {
+    layout: {background:{type:'solid', color:'#1e2329'}, textColor:'#848e9c', fontSize:10},
+    grid: {vertLines:{color:'rgba(43,49,57,.55)'}, horzLines:{color:'rgba(43,49,57,.55)'}},
+    rightPriceScale: {borderColor:'#2b3139', scaleMargins:{top:.06, bottom:.53}},
+    timeScale: {borderColor:'#2b3139', timeVisible:true, secondsVisible:false},
+    crosshair: {mode:0}
+  });
+  sCandle = lw.addCandlestickSeries({upColor:'#0ecb81', downColor:'rgba(246,70,93,0.35)', borderVisible:false,
+                                     wickUpColor:'#0ecb81', wickDownColor:'rgba(246,70,93,0.35)'});
+  sEmaBuyGlow2 = lw.addLineSeries({color:'rgba(14,203,129,0.13)', lineWidth:4, priceScaleId:'',
+                                   priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false});
+  sEmaBuyGlow1 = lw.addLineSeries({color:'rgba(14,203,129,0.32)', lineWidth:4, priceScaleId:'',
+                                   priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false});
+  sEmaBuy = lw.addLineSeries({color:'#0ecb81', lineWidth:2, priceScaleId:'',
+                              priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false});
+  sEmaSell = lw.addLineSeries({color:'rgba(246,70,93,0.45)', lineWidth:1, priceScaleId:'',
+                               priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false});
+  sEmaBuy.priceScale().applyOptions({scaleMargins:{top:.04, bottom:0}});
+  sMA7  = lw.addLineSeries({color:'#fcd535', lineWidth:1, priceLineVisible:false, lastValueVisible:false});
+  sMA25 = lw.addLineSeries({color:'#e056fd', lineWidth:1, priceLineVisible:false, lastValueVisible:false});
+  sMA99 = lw.addLineSeries({color:'#3b82f6', lineWidth:1, priceLineVisible:false, lastValueVisible:false});
+  new ResizeObserver(() => lw.applyOptions({width: el.clientWidth, height: el.clientHeight})).observe(el);
+  aplicarPrecio();
+}
+
+function aplicarPrecio(){
+  const vis = mostrarPrecio;
+  const vp = volPct / 100;
+  [sCandle, sMA7, sMA25, sMA99].forEach(s => s && s.applyOptions({visible: vis}));
+  if(sEmaBuy){
+    // alto del área de líneas: con precio ON usa el % elegido; con precio OFF ocupa todo
+    sEmaBuy.priceScale().applyOptions({
+      scaleMargins: vis ? {top: Math.max(0.05, 1 - vp), bottom: 0} : {top: 0.04, bottom: 0}
+    });
+  }
+  if(lw){
+    try{
+      lw.priceScale('right').applyOptions({
+        scaleMargins: vis ? {top: 0.06, bottom: Math.min(0.95, vp + 0.02)} : {top: 0.06, bottom: 0.06}
+      });
+      lw.applyOptions({rightPriceScale: {visible: vis}});
+    }catch(e){}
+  }
+  const b = $('btnPrecio');
+  if(b){ b.textContent = 'Precio: ' + (vis ? 'ON' : 'OFF'); b.classList.toggle('on', vis); }
+}
+
+function setChart(candles){
+  if(!lw) initChart();
+  sCandle.setData(candles.map(x => ({time:x.t, open:x.o, high:x.h, low:x.l, close:x.c})));
+  const ma = n => {
+    const out = []; let suma = 0;
+    for(let i=0;i<candles.length;i++){
+      suma += candles[i].c;
+      if(i >= n) suma -= candles[i-n].c;
+      if(i >= n-1) out.push({time:candles[i].t, value:suma/n});
+    }
+    return out;
+  };
+  const m7 = ma(7), m25 = ma(25), m99 = ma(99);
+  sMA7.setData(m7); sMA25.setData(m25); sMA99.setData(m99);
+  const emaArr = (vals, n) => {
+    const k = 2 / (n + 1); let prev = null;
+    return vals.map(v => (prev = prev === null ? v : v * k + prev * (1 - k)));
+  };
+  const compras = emaArr(candles.map(x => x.b || 0), 5).map((v, i) => ({time: candles[i].t, value: v}));
+  const ventas = emaArr(candles.map(x => Math.max((x.v || 0) - (x.b || 0), 0)), 5)
+                    .map((v, i) => ({time: candles[i].t, value: v}));
+  sEmaBuyGlow2.setData(compras); sEmaBuyGlow1.setData(compras);
+  sEmaBuy.setData(compras); sEmaSell.setData(ventas);
+  const last = a => a.length ? a[a.length-1].value : null;
+  const l7 = last(m7), l25 = last(m25), l99 = last(m99);
+  const lc = last(compras), lv2 = last(ventas);
+  let leyenda =
+    `<span class="ebuy">EMA compras ${lc != null ? fmtQ(lc) : '—'}</span> · ` +
+    `<span class="esell">EMA ventas ${lv2 != null ? fmtQ(lv2) : '—'}</span>`;
+  if(mostrarPrecio){
+    leyenda = `<span class="ma7">MA(7) ${l7 ? fmtP(l7) : '—'}</span> · ` +
+              `<span class="ma25">MA(25) ${l25 ? fmtP(l25) : '—'}</span> · ` +
+              `<span class="ma99">MA(99) ${l99 ? fmtP(l99) : '—'}</span> · ` + leyenda;
+  }
+  $('maLegend').innerHTML = leyenda;
+  if(!chartListo){ lw.timeScale().fitContent(); chartListo = true; }
+}
+
+function renderBook(bk){
+  if(!bk) return;
+  const fila = (lado, p, q, cum, maxCum) => {
+    const w = maxCum ? Math.max(2, cum / maxCum * 100) : 0;
+    return `<div class="ob-row ${lado}"><div class="bar" style="width:${w}%"></div>
+      <span class="p">${fmtP(p)}</span><span class="a">${fmtQ(q)}</span><span class="t">${fmtT(p*q)}</span></div>`;
+  };
+  let cum = 0;
+  const asksC = bk.asks.map(([p,q]) => (cum += q, [p,q,cum]));
+  const maxA = cum || 1;
+  $('obAsks').innerHTML = asksC.slice().reverse().map(([p,q,c]) => fila('ask', p, q, c, maxA)).join('');
+  cum = 0;
+  const bidsC = bk.bids.map(([p,q]) => (cum += q, [p,q,cum]));
+  const maxB = cum || 1;
+  $('obBids').innerHTML = bidsC.map(([p,q,c]) => fila('bid', p, q, c, maxB)).join('');
+  const bestAsk = bk.asks.length ? bk.asks[0][0] : 0;
+  const bestBid = bk.bids.length ? bk.bids[0][0] : 0;
+  const mid = (bestAsk + bestBid) / 2;
+  const elP = $('obPrecio');
+  elP.textContent = fmtP(mid);
+  elP.className = 'p ' + (prevPrecio == null ? '' : (mid >= prevPrecio ? 'up' : 'down'));
+  $('obSpread').textContent = `spread ${fmtP(bestAsk - bestBid)} (${((bestAsk - bestBid) / mid * 100).toFixed(3)}%)`;
+  const bidQ = bk.bids.reduce((a, [,q]) => a + q, 0);
+  const askQ = bk.asks.reduce((a, [,q]) => a + q, 0);
+  const bidNot = bk.bids.reduce((a, [p,q]) => a + p*q, 0);
+  const askNot = bk.asks.reduce((a, [p,q]) => a + p*q, 0);
+  $('obRatio').textContent = `B/V ${(bidQ / (askQ || 1)).toFixed(2)}`;
+  $('obBidVol').textContent = `${fmtQ(bidQ)} ${base} · ${fmtT(bidNot)} ${quote}`;
+  $('obAskVol').textContent = `${fmtQ(askQ)} ${base} · ${fmtT(askNot)} ${quote}`;
+}
+
+// ===== Libro en vivo por WebSocket (igual que Binance) =====
+let ws = null, wsSymbol = '';
+
+function renderBookLive(bidsRaw, asksRaw){
+  const bids = bidsRaw.map(([p,q]) => [parseFloat(p), parseFloat(q)]);
+  const asks = asksRaw.map(([p,q]) => [parseFloat(p), parseFloat(q)]);
+  renderBook({
+    bids, asks,
+    bid_vol: bids.reduce((a, [,q]) => a + q, 0),
+    ask_vol: asks.reduce((a, [,q]) => a + q, 0)
+  });
+}
+
+function abrirWS(symbol){
+  if(ws && wsSymbol === symbol && ws.readyState <= 1) return;
+  wsSymbol = symbol;
+  if(ws){ try{ ws.close(); }catch(e){} ws = null; }
+  const s = symbol.toLowerCase();
+  ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${s}@depth20@100ms/${s}@trade`);
+  ws.onmessage = ev => {
+    try{
+      const m = JSON.parse(ev.data).data;
+      if(m.bids && m.asks) renderBookLive(m.bids, m.asks);
+      if(m.p){
+        const p = parseFloat(m.p);
+        $('precio').textContent = fmtP(p);
+        prevPrecio = p;
+      }
+    }catch(e){}
+  };
+  ws.onclose = () => { if(wsSymbol === symbol) setTimeout(() => abrirWS(wsSymbol), 2000); };
+  ws.onerror = () => {};
+}
+
+function render(st){
+  const vivo = ws && ws.readyState === 1;
+  if(!vivo){
+    $('precio').textContent = st.precio ? fmtP(st.precio) : '—';
+    if(st.precio != null) prevPrecio = st.precio;
+  }
+  $('hora').textContent = st.updated ? `act. ${st.updated}` : '—';
+  const mm = /^(.+?)(USDT|USDC|FDUSD|BUSD|TUSD|USDP|BIDR)$/.exec((st.config && st.config.symbol) || '');
+  base = mm ? mm[1] : (((st.config && st.config.symbol) || 'BTC').slice(0, -4) || 'BTC');
+  quote = mm ? mm[2] : 'USDT';
+  $('obH1').textContent = `Precio (${quote})`;
+  $('obH2').textContent = `Monto (${base})`;
+  $('obH3').textContent = 'Total';
+  const pill = $('estadoPill');
+  pill.textContent = st.error ? 'error' : st.estado;
+  pill.className = 'pill ' + (st.estado === 'OPORTUNO' ? 'ok' : (st.error ? 'warn' : ''));
+
+  const b = $('banner');
+  if(st.alert && st.estado === 'OPORTUNO'){
+    b.style.display = 'block';
+    b.className = 'banner' + (st.alert.nueva ? '' : ' vieja');
+    $('bannerTitulo').textContent = st.alert.nueva ? '⚡ OPORTUNO COMPRAR' : '⚡ Señal activa (ya avisada)';
+    $('bannerDetalle').innerHTML = `${esc(st.alert.razones.join(' · '))} — precio <b>${fmtP(st.alert.precio)}</b> · ${st.alert.ts}` +
+      (st.alert.subida_3m > 0.4 ? ` · <span class="warn">ojo: ya subió ${st.alert.subida_3m}% en 3 min</span>` : '');
+    const key = st.alert.ts + '|' + st.alert.precio;
+    if(st.alert.nueva && key !== lastAlertKey){ lastAlertKey = key; beep(); }
+  } else {
+    b.style.display = 'none';
+  }
+
+  if(st.series && st.series.candles) setChart(st.series.candles);
+  if(!vivo) renderBook(st.book);
+
+  const m = st.metrics || {};
+  const sc = st.score || 0;
+  const badge = $('scoreBadge');
+  badge.textContent = `${sc}/4`;
+  badge.className = 'score s' + sc;
+  $('mSell').textContent = m.slope_sell != null ? `${m.slope_sell}%` : '—';
+  $('mSell').style.color = (m.slope_sell <= (st.config?.t_sell ?? -8)) ? 'var(--green)' : 'var(--txt)';
+  $('mBuy').textContent = m.slope_buy != null ? `${m.slope_buy}%` : '—';
+  $('mBuy').style.color = (m.slope_buy >= (st.config?.t_buy ?? 15)) ? 'var(--green)' : 'var(--txt)';
+  $('mImb').textContent = m.imb != null ? `${m.imb}%` : '—';
+  $('mImb').style.color = (m.imb >= (st.config?.imb_min ?? 5)) ? 'var(--green)' : 'var(--txt)';
+  $('mRatio').textContent = m.ratio != null ? m.ratio : '—';
+  $('mSub').textContent = m.subida_3m != null ? `${m.subida_3m}%` : '—';
+  $('mCruce').textContent = st.cruce ? 'SÍ' : 'no';
+  $('mCruce').style.color = st.cruce ? 'var(--green)' : 'var(--muted)';
+
+  const la = $('listaAlertas');
+  const alertas = (st.alerts || []).slice().reverse();
+  la.innerHTML = alertas.length
+    ? alertas.map(a => `<div class="alerta"><b>⚡ ${esc(a.ts)}</b> · precio ${fmtP(a.precio)} · score ${a.score}/4<br><span class="muted">${esc((a.razones||[]).join(' · '))}</span></div>`).join('')
+    : '<span class="muted">sin alertas todavía</span>';
+
+  if(firstState){
+    firstState = false;
+    const sel = $('symbolSel');
+    sel.innerHTML = (st.symbols||[]).map(s => `<option value="${s}">${s}</option>`).join('');
+    sel.value = st.config.symbol;
+    abrirWS(st.config.symbol);
+    const iv = $('intervalSel');
+    iv.innerHTML = (st.intervals||[]).map(x => `<option value="${x}">${x}</option>`).join('');
+    iv.value = st.config.interval || '1m';
+    $('cfgSens').value = String(st.config.sens);
+    $('volPct').value = String(volPct);
+    $('cfgBuy').value = st.config.t_buy;
+    $('cfgSell').value = st.config.t_sell;
+    $('cfgImb').value = Math.round((st.config.imb_min || 0) * 100);
+    $('cfgCool').value = st.config.cooldown_min;
+  }
+  $('cfgInfo').textContent = st.error ? `error: ${st.error}` : `activo: ${st.config.symbol} · sens ${st.config.sens}/4`;
+}
+
+async function load(){ render(await api('/api/state')); }
+
+$('btnPrecio').onclick = () => {
+  mostrarPrecio = !mostrarPrecio;
+  localStorage.setItem('precioOn', mostrarPrecio ? '1' : '0');
+  aplicarPrecio();
+};
+$('volPct').onchange = () => {
+  volPct = parseInt($('volPct').value, 10) || 50;
+  localStorage.setItem('volPct', String(volPct));
+  aplicarPrecio();
+};
+$('symbolSel').onchange = async () => {
+  await api('/api/config', {symbol: $('symbolSel').value});
+  chartListo = false; firstState = true; load();
+};
+$('intervalSel').onchange = async () => {
+  await api('/api/config', {interval: $('intervalSel').value});
+  chartListo = false; firstState = true; load();
+};
+$('btnAplicar').onclick = async () => {
+  await api('/api/config', {
+    symbol: $('symbolSel').value,
+    interval: $('intervalSel').value,
+    sens: $('cfgSens').value,
+    t_buy: $('cfgBuy').value,
+    t_sell: $('cfgSell').value,
+    imb_min: (parseFloat($('cfgImb').value) || 0) / 100,
+    cooldown_min: $('cfgCool').value
+  });
+  firstState = true; load();
+};
+
+load();
+setInterval(load, 3000);
+</script>
+</body>
+</html>
